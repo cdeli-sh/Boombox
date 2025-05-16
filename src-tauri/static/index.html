@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Boombox Remote</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+
+    h1 {
+      color: #333;
+      text-align: center;
+    }
+
+    .card {
+      background-color: white;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    button {
+      background-color: #4CAF50;
+      border: none;
+      color: white;
+      padding: 10px 15px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 16px;
+      margin: 4px 2px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    button:disabled {
+      background-color: #cccccc;
+    }
+
+    .control-buttons {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+
+    select,
+    input {
+      width: 100%;
+      padding: 8px;
+      margin: 8px 0;
+      display: inline-block;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+
+    .volume-control {
+      width: 100%;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Boombox Remote</h1>
+
+  <div class="card">
+    <h2>Audio Devices</h2>
+    <select id="deviceSelect">
+      <option value="">Loading devices...</option>
+    </select>
+    <button onclick="setDevice()">Set Device</button>
+  </div>
+
+  <div class="card">
+    <h2>Folders</h2>
+    <select id="folderSelect">
+      <option value="">Loading folders...</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <h2>Files</h2>
+    <select id="fileSelect">
+      <option value="">Select a folder first</option>
+    </select>
+    <button onclick="playSelected()">Play Selected</button>
+  </div>
+
+  <div class="card">
+    <h2>Playback Controls</h2>
+    <div class="control-buttons">
+      <button onclick="playAudio()">Play</button>
+      <button onclick="pauseAudio()">Pause</button>
+      <button onclick="resumeAudio()">Resume</button>
+      <button onclick="stopAudio()">Stop</button>
+    </div>
+    <h3>Volume</h3>
+    <input type="range" min="0" max="100" value="50" class="volume-control" id="volumeSlider" oninput="updateVolume()">
+  </div>
+
+  <script>
+    // API endpoint
+    const API_BASE = window.location.origin;
+    let currentFile = '';
+
+    // Initialize the page
+    window.onload = async function () {
+      await loadDevices();
+      await loadFolders();
+
+      // Add event listener for folder selection
+      document.getElementById('folderSelect').addEventListener('change', function () {
+        const selectedFolder = this.value;
+        if (selectedFolder) {
+          loadFiles(selectedFolder);
+        }
+      });
+    };
+
+    // Load audio devices
+    async function loadDevices() {
+      try {
+        const response = await fetch(`${API_BASE}/devices`);
+        const data = await response.json();
+
+        const deviceSelect = document.getElementById('deviceSelect');
+        deviceSelect.innerHTML = '';
+
+        data.devices.forEach(device => {
+          const option = document.createElement('option');
+          option.value = device;
+          option.textContent = device;
+          deviceSelect.appendChild(option);
+        });
+      } catch (error) {
+        console.error('Error loading devices:', error);
+      }
+    }
+
+    // Set audio device
+    async function setDevice() {
+      const deviceName = document.getElementById('deviceSelect').value;
+      if (!deviceName) return;
+
+      try {
+        await fetch(`${API_BASE}/device`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ device_name: deviceName }),
+        });
+        alert(`Device set to: ${deviceName}`);
+      } catch (error) {
+        console.error('Error setting device:', error);
+        alert('Failed to set device');
+      }
+    }
+
+    // Load folders
+    async function loadFolders() {
+      try {
+        const response = await fetch(`${API_BASE}/folders`);
+        const data = await response.json();
+
+        const folderSelect = document.getElementById('folderSelect');
+        folderSelect.innerHTML = '';
+
+        if (data.folders.length === 0) {
+          const option = document.createElement('option');
+          option.value = '';
+          option.textContent = 'No folders available';
+          folderSelect.appendChild(option);
+          return;
+        }
+
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = 'Select a folder';
+        folderSelect.appendChild(defaultOption);
+
+        data.folders.forEach(folder => {
+          const option = document.createElement('option');
+          option.value = folder;
+          option.textContent = folder;
+          folderSelect.appendChild(option);
+        });
+      } catch (error) {
+        console.error('Error loading folders:', error);
+      }
+    }
+
+    // Load files in a folder
+    async function loadFiles(folder) {
+      try {
+        const response = await fetch(`${API_BASE}/files`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ folder }),
+        });
+        const data = await response.json();
+
+        const fileSelect = document.getElementById('fileSelect');
+        fileSelect.innerHTML = '';
+
+        if (data.files.length === 0) {
+          const option = document.createElement('option');
+          option.value = '';
+          option.textContent = 'No audio files in this folder';
+          fileSelect.appendChild(option);
+          return;
+        }
+
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = 'Select a file';
+        fileSelect.appendChild(defaultOption);
+
+        data.files.forEach(file => {
+          const option = document.createElement('option');
+          option.value = file;
+          option.textContent = file.split('/').pop();
+          fileSelect.appendChild(option);
+        });
+      } catch (error) {
+        console.error('Error loading files:', error);
+      }
+    }
+
+    // Play selected file
+    async function playSelected() {
+      const filePath = document.getElementById('fileSelect').value;
+      if (!filePath) return;
+
+      currentFile = filePath;
+      await playAudio();
+    }
+
+    // Play audio
+    async function playAudio() {
+      if (!currentFile) {
+        alert('Please select a file first');
+        return;
+      }
+
+      try {
+        await fetch(`${API_BASE}/play`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ path: currentFile }),
+        });
+      } catch (error) {
+        console.error('Error playing audio:', error);
+        alert('Failed to play audio');
+      }
+    }
+
+    // Pause audio
+    async function pauseAudio() {
+      try {
+        await fetch(`${API_BASE}/pause`, {
+          method: 'POST',
+        });
+      } catch (error) {
+        console.error('Error pausing audio:', error);
+        alert('Failed to pause audio');
+      }
+    }
+
+    // Resume audio
+    async function resumeAudio() {
+      try {
+        await fetch(`${API_BASE}/resume`, {
+          method: 'POST',
+        });
+      } catch (error) {
+        console.error('Error resuming audio:', error);
+        alert('Failed to resume audio');
+      }
+    }
+
+    // Stop audio
+    async function stopAudio() {
+      try {
+        await fetch(`${API_BASE}/stop`, {
+          method: 'POST',
+        });
+      } catch (error) {
+        console.error('Error stopping audio:', error);
+        alert('Failed to stop audio');
+      }
+    }
+
+    // Update volume
+    async function updateVolume() {
+      const volume = document.getElementById('volumeSlider').value / 100;
+
+      try {
+        await fetch(`${API_BASE}/volume`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ volume }),
+        });
+      } catch (error) {
+        console.error('Error setting volume:', error);
+      }
+    }
+  </script>
+</body>
+
+</html>
